@@ -1,6 +1,8 @@
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Comparator;
 
 /**
  * Autocorrect
@@ -11,6 +13,10 @@ import java.io.IOException;
  * @author William Beesley
  */
 public class Autocorrect {
+    public String[] dictionary;
+    public int thresh;
+
+    public ArrayList<String>[][] bigrams = new ArrayList[26][26];
 
     /**
      * Constucts an instance of the Autocorrect class.
@@ -33,7 +39,7 @@ public class Autocorrect {
                     table[i][j] = table[i-1][j-1];
                 }
                 else {
-                    table[i][j] = Math.min(table[i-1][j-1], Math.min(table[i-1][j], table[i][j-1]));
+                    table[i][j] = 1 + Math.min(table[i-1][j-1], Math.min(table[i-1][j], table[i][j-1]));
                 }
             }
         }
@@ -42,9 +48,19 @@ public class Autocorrect {
 
 
     public Autocorrect(String[] words, int threshold) {
-        for (int i = 0; i < words.length; i++) {
-            if (edit_distance(words[i], dictionary[1]) <= threshold) {
-                System.out.println(words[i]);
+        dictionary = words;
+        thresh = threshold;
+        for (int i = 0; i < 26; i++) {
+            for (int j = 0; j < 26; j++) {
+                bigrams[i][j] = new ArrayList<>();
+            }
+        }
+        for (int i = 0; i < dictionary.length; i++) {
+            String word = dictionary[i];
+            for (int j = 0; j < word.length() - 1; j++) {
+                int letter_one = word.charAt(j) - 'a';
+                int letter_two = word.charAt(j+1) - 'a';
+                bigrams[letter_one][letter_two].add(word);
             }
         }
     }
@@ -56,8 +72,27 @@ public class Autocorrect {
      * to threshold, sorted by edit distnace, then sorted alphabetically.
      */
     public String[] runTest(String typed) {
-
-        return new String[0];
+        ArrayList<StringDistancePair> suggested = new ArrayList<>();
+        for (int i = 0; i < typed.length()-1; i++) {
+            for (int j = 0; j < bigrams[typed.charAt(i) - 'a'][typed.charAt(i+1) - 'a'].size(); j++) {
+                int ed = edit_distance(bigrams[typed.charAt(i) - 'a'][typed.charAt(i+1) - 'a'].get(j), typed);
+                if (ed <= thresh) {
+                    suggested.add(new StringDistancePair(ed, bigrams[typed.charAt(i) - 'a'][typed.charAt(i+1) - 'a'].get(j)));
+                }
+            }
+        }
+        suggested.sort(Comparator.comparing(StringDistancePair::getWord));
+        for (int i = suggested.size() - 1; i > 0; i--) {
+            if (suggested.get(i).getWord().equals(suggested.get(i-1).getWord())) {
+                suggested.remove(i);
+            }
+        }
+        suggested.sort(Comparator.comparing(StringDistancePair::getDistance));
+        String[] suggested_words = new String[suggested.size()];
+        for (int i = 0; i < suggested.size(); i++) {
+            suggested_words[i] = suggested.get(i).getWord();
+        }
+        return suggested_words;
     }
 
 
